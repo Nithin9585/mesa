@@ -28,6 +28,8 @@ if TYPE_CHECKING:
 
 T = TypeVar("T", bound="Cell")
 
+_RAISE = object()  # Sentinel for raising error on empty collection
+
 
 class CellCollection[T: Cell]:
     """An immutable collection of cells.
@@ -100,15 +102,24 @@ class CellCollection[T: Cell]:
         """Select a random cell."""
         return self.random.choice(self.cells)
 
-    def select_random_agent(self) -> CellAgent:
+    def select_random_agent(self, default=_RAISE) -> CellAgent:
         """Select a random agent.
 
+        Args:
+            default: Value to return if empty. If not provided, raises LookupError.
+
         Returns:
-            CellAgent instance
+            Random agent or default value if collection is empty.
 
-
+        Raises:
+            LookupError: If empty and no default provided.
         """
-        return self.random.choice(list(self.agents))
+        agents_list = list(self.agents)
+        if not agents_list:
+            if default is _RAISE:
+                raise LookupError("Cannot select from empty collection")
+            return default
+        return self.random.choice(agents_list)
 
     def select(
         self,
