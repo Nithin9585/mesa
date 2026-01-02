@@ -28,6 +28,7 @@ put the code inside an ``if __name__ == '__main__':`` code black as shown below:
 
 """
 
+import bisect
 import inspect
 import itertools
 import multiprocessing
@@ -253,7 +254,14 @@ def _collect_data(
         )
     dc = model.datacollector
 
-    model_data = {param: values[step] for param, values in dc.model_vars.items()}
+    if hasattr(dc, "_collection_steps"):
+        idx = bisect.bisect_right(dc._collection_steps, step) - 1
+        if idx >= 0 and idx < len(dc._collection_steps) and dc._collection_steps[idx] == step:
+            model_data = {param: values[idx] for param, values in dc.model_vars.items()}
+        else:
+            model_data = {param: values[step] for param, values in dc.model_vars.items()}
+    else:
+        model_data = {param: values[step] for param, values in dc.model_vars.items()}
 
     all_agents_data = []
     raw_agent_data = dc._agent_records.get(step, [])

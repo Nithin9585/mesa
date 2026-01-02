@@ -360,3 +360,45 @@ def test_iterations_deprecation_warning():
     """Test that using iterations parameter raises DeprecationWarning."""
     with pytest.warns(DeprecationWarning, match="iterations.*deprecated.*rng"):
         mesa.batch_run(MockModel, {}, number_processes=1, iterations=1)
+
+
+class TimeDilationModel(Model):
+    """Model that collects data multiple times per step to test BatchRunner alignment."""
+    def __init__(self, *args, **kwargs):
+        """Initialize the model."""
+        self.schedule = None
+        super().__init__()
+        self.datacollector = DataCollector(
+            model_reporters={"RealStep": lambda m: m.steps}
+        )
+        # Collect INITIAL state
+        self.datacollector.collect(self)
+
+    def step(self):
+        """Advance the model by one step."""
+        super().step()
+        # Collect data TWICE per step to simulate sub-step resolution
+        self.datacollector.collect(self)
+        self.datacollector.collect(self)
+
+
+def test_batch_run_time_dilation():
+    """Test that batch_run correctly aligns data when collection frequency != 1 step."""
+    results = mesa.batch_run(
+        TimeDilationModel,
+        parameters={},
+        number_processes=1,
+        rng=[None],  # Use rng instead of iterations to avoid deprecation warning
+        max_steps=5,
+        data_collection_period=1,
+        display_progress=False
+    )
+
+    # We expect to find data for 'Step 5'
+    # Without the fix, it grabs index 5 (Step 2/3). With fix, it finds correct Step 5.
+    last_result = results[-1]
+    reported_step = last_result["Step"]
+    actual_step_data = last_result["RealStep"]
+
+    assert reported_step == actual_step_data, \
+        f"BatchRunner returned data from Step {actual_step_data} when asked for Step {reported_step}"

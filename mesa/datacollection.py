@@ -115,6 +115,7 @@ class DataCollector:
         self.agenttype_reporters = {}
 
         self.model_vars = {}
+        self._collection_steps = []
         self._agent_records = {}
         self._agenttype_records = {}
         self.tables = {}
@@ -355,6 +356,7 @@ class DataCollector:
     def collect(self, model):
         """Collect all the data for the given model object."""
         if self.model_reporters:
+            self._collection_steps.append(model.steps)
             if not self._validated:
                 for name, reporter in self.model_reporters.items():
                     self._validate_model_reporter(name, reporter, model)
