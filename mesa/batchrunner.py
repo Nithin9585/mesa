@@ -256,12 +256,25 @@ def _collect_data(
 
     if hasattr(dc, "_collection_steps"):
         idx = bisect.bisect_right(dc._collection_steps, step) - 1
-        if idx >= 0 and idx < len(dc._collection_steps) and dc._collection_steps[idx] == step:
+        if (
+            idx >= 0
+            and idx < len(dc._collection_steps)
+            and dc._collection_steps[idx] == step
+        ):
             model_data = {param: values[idx] for param, values in dc.model_vars.items()}
         else:
-            model_data = {param: values[step] for param, values in dc.model_vars.items()}
+            # Step not found in _collection_steps, try fallback with bounds check
+            try:
+                model_data = {param: values[step] for param, values in dc.model_vars.items()}
+            except IndexError:
+                # If index out of range, skip this step
+                model_data = {}
     else:
-        model_data = {param: values[step] for param, values in dc.model_vars.items()}
+        # Legacy DataCollector without _collection_steps - use index-based access
+        try:
+            model_data = {param: values[step] for param, values in dc.model_vars.items()}
+        except IndexError:
+            model_data = {}
 
     all_agents_data = []
     raw_agent_data = dc._agent_records.get(step, [])

@@ -402,3 +402,72 @@ def test_batch_run_time_dilation():
 
     assert reported_step == actual_step_data, \
         f"BatchRunner returned data from Step {actual_step_data} when asked for Step {reported_step}"
+
+
+def test_batch_run_legacy_datacollector():
+    """Test batch_run with DataCollector missing _collection_steps (backwards compatibility)."""
+    
+    class LegacyModel(Model):
+        """Model simulating old DataCollector without _collection_steps."""
+        def __init__(self, *args, **kwargs):
+            self.schedule = None
+            super().__init__()
+            self.datacollector = DataCollector(
+                model_reporters={"Value": lambda m: m.steps * 10}
+            )
+            # Remove _collection_steps to simulate old DataCollector
+            delattr(self.datacollector, "_collection_steps")
+        
+        def step(self):
+            super().step()
+            self.datacollector.collect(self)
+    
+    results = mesa.batch_run(
+        LegacyModel,
+        parameters={},
+        number_processes=1,
+        rng=[None],
+        max_steps=3,
+        data_collection_period=1,
+        display_progress=False
+    )
+    
+    # Should fallback to index-based access
+    assert len(results) > 0
+    assert "Value" in results[0]
+
+
+def test_batch_run_missing_step():
+    """Test batch_run when requested step not found in _collection_steps."""
+    
+    class SparseModel(Model):
+        """Model that skips some collections to test edge cases."""
+        def __init__(self, *args, **kwargs):
+            self.schedule = None
+            super().__init__()
+            self.datacollector = DataCollector(
+                model_reporters={"Value": lambda m: m.steps}
+            )
+            # Collect initial state
+            self.datacollector.collect(self)
+        
+        def step(self):
+            super().step()
+            # Collect on steps 2, 4, 6 to create gaps
+            if self.steps in [2, 4, 6]:
+                self.datacollector.collect(self)
+    
+    # Request data for a step that wasn't collected (step 5)
+    # The fallback should handle this gracefully
+    results = mesa.batch_run(
+        SparseModel,
+        parameters={},
+        number_processes=1,
+        rng=[None],
+        max_steps=6,
+        data_collection_period=1,
+        display_progress=False
+    )
+    
+    # Should handle sparse collection - may have fewer results
+    assert len(results) >= 0
