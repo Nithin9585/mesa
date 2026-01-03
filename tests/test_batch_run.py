@@ -370,7 +370,7 @@ class TimeDilationModel(Model):
         self.schedule = None
         super().__init__()
         self.datacollector = DataCollector(
-            model_reporters={"RealStep": lambda m: m.steps}
+            model_reporters={"RealStep": lambda m: m.time}
         )
         # Collect INITIAL state
         self.datacollector.collect(self)
@@ -416,7 +416,7 @@ def test_batch_run_legacy_datacollector():
             self.schedule = None
             super().__init__()
             self.datacollector = DataCollector(
-                model_reporters={"Value": lambda m: m.steps * 10}
+                model_reporters={"Value": lambda m: m.time * 10}
             )
             # Remove _collection_steps to simulate old DataCollector
             delattr(self.datacollector, "_collection_steps")
@@ -450,7 +450,7 @@ def test_batch_run_missing_step():
             self.schedule = None
             super().__init__()
             self.datacollector = DataCollector(
-                model_reporters={"Value": lambda m: m.steps}
+                model_reporters={"Value": lambda m: m.time}
             )
             # Collect initial state
             self.datacollector.collect(self)
@@ -458,7 +458,7 @@ def test_batch_run_missing_step():
         def step(self):
             super().step()
             # Collect on steps 2, 4, 6 to create gaps
-            if self.steps in [2, 4, 6]:
+            if self.time in [2, 4, 6]:
                 self.datacollector.collect(self)
 
     # Request data for a step that wasn't collected (step 5)
